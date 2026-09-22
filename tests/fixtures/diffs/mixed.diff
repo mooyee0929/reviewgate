@@ -1,0 +1,56 @@
+diff --git a/app/main.py b/app/main.py
+index 1111111..2222222 100644
+--- a/app/main.py
++++ b/app/main.py
+@@ -10,6 +10,8 @@ def handler(event):
+     data = load(event)
+-    return data
++    import pdb; pdb.set_trace()
++    result = transform(data)
++    return result
+ 
+ 
+ def unchanged():
+@@ -40,3 +42,4 @@ def tail():
+     pass
++<<<<<<< HEAD
++    # FIXME: resolve
+diff --git a/old_name.txt b/new_name.txt
+similarity index 90%
+rename from old_name.txt
+rename to new_name.txt
+index 3333333..4444444 100644
+--- a/old_name.txt
++++ b/new_name.txt
+@@ -1 +1,2 @@
+ hello
++world
+diff --git a/gone.py b/gone.py
+deleted file mode 100644
+index 5555555..0000000
+--- a/gone.py
++++ /dev/null
+@@ -1,2 +0,0 @@
+-def gone():
+-    pass
+diff --git a/logo.png b/logo.png
+new file mode 100644
+index 0000000..6666666
+Binary files /dev/null and b/logo.png differ
+diff --git a/package-lock.json b/package-lock.json
+index 7777777..8888888 100644
+--- a/package-lock.json
++++ b/package-lock.json
+@@ -1,2 +1,2 @@
+ {
+-  "v": 1
++  "v": 2
+diff --git a/src/engine.cpp b/src/engine.cpp
+index 9999999..aaaaaaa 100644
+--- a/src/engine.cpp
++++ b/src/engine.cpp
+@@ -5,2 +5,3 @@
+ int run() {
++  std::cout << "debug" << std::endl;
+   return 0;
+\ No newline at end of file

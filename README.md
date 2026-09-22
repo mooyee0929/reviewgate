@@ -61,6 +61,21 @@ report.to_dict()         # JSON-ready
 `analyze_files()` takes already-parsed `ChangedFile`s, which is how a pipeline
 stage will call it.
 
+### As a Claude Code agent
+
+`.claude/agents/history-reviewer.md` defines a read-only subagent that runs
+`reviewgate history --json`, then verifies each finding against the code and
+the origin commit before reporting it (confirmed / disproved / unverified).
+Install it globally so any repo can use it:
+
+```
+uv tool install --editable ~/dev/reviewgate
+cp ~/dev/reviewgate/.claude/agents/history-reviewer.md ~/.claude/agents/
+```
+
+Then in Claude Code: "use the history-reviewer agent on this branch against
+main". New agent files are picked up when a session starts.
+
 ### Co-change cache
 
 `.review/cochange.json` holds per-file and per-pair commit counts plus the sha

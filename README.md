@@ -61,20 +61,34 @@ report.to_dict()         # JSON-ready
 `analyze_files()` takes already-parsed `ChangedFile`s, which is how a pipeline
 stage will call it.
 
-### As a Claude Code agent
+### As Claude Code agents
 
-`.claude/agents/history-reviewer.md` defines a read-only subagent that runs
-`reviewgate history --json`, then verifies each finding against the code and
-the origin commit before reporting it (confirmed / disproved / unverified).
-Install it globally so any repo can use it:
+`.claude/agents/` holds the review roles, one agent per file, each read-only
+and each owning one kind of evidence:
+
+| agent | evidence | what it produces |
+|---|---|---|
+| `history-reviewer` | commits, blame, co-change | verified regression risk, partner files, hot-spot reading |
+| `intent-reviewer` | commit messages vs diff | claims done / missing, scope creep, description drift |
+| `correctness-reviewer` | inference | hypotheses with a concrete failure scenario |
+| `security-reviewer` | inference | same, security checklist |
+| `tests-reviewer` | inference | test gaps, weakened or ineffective tests |
+| `verifier` | execution in a throwaway worktree | confirmed / disproved / unverified per candidate |
+
+`.claude/skills/reviewgate/SKILL.md` is the orchestrator (`/reviewgate`):
+it runs the history CLI, fans out to the reviewers in parallel, hands the
+candidates to the verifier and reports only what survived, ending with
+`BLOCK` / `WARN` / `OK`.
+
+Install everything globally so any repo can use it:
 
 ```
 uv tool install --editable ~/dev/reviewgate
-cp ~/dev/reviewgate/.claude/agents/history-reviewer.md ~/.claude/agents/
+cp ~/dev/reviewgate/.claude/agents/*.md ~/.claude/agents/
+cp -r ~/dev/reviewgate/.claude/skills/reviewgate ~/.claude/skills/
 ```
 
-Then in Claude Code: "use the history-reviewer agent on this branch against
-main". New agent files are picked up when a session starts.
+New agent and skill files are picked up when a Claude Code session starts.
 
 ### Co-change cache
 

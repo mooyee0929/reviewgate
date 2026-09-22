@@ -22,14 +22,18 @@ executed safely there.
 
 Never run anything in the caller's working tree that could modify it.
 
-1. Before the first executable step:
-   `git worktree add --detach "$TMPDIR/reviewgate-verify-$$" <head>`
-   and `cd` into that path for every command that follows.
+1. Before the first executable step, create the sandbox once:
+   `W=$(mktemp -d "${TMPDIR:-/tmp}/reviewgate-verify.XXXXXX") && git worktree add --detach "$W" <head> && echo "$W"`.
+   Shell state does not survive between your Bash calls, so copy the printed
+   path and use it literally (`cd /tmp/reviewgate-verify.abc123 && ...`) in
+   every later command.
 2. Detect the project's own runner from its manifest: `pyproject.toml` →
    `uv run pytest` (or `pytest` when there is no `uv.lock`), `package.json` →
    `npm test`, `Package.swift` → `swift run <Name>Checks`, `Cargo.toml` →
-   `cargo test`. Do not install anything; if the runner is missing, the item
-   is `unverified`.
+   `cargo test`. A Python repo with no manifest: `python3 -m pytest` if
+   `python3 -c "import pytest"` succeeds, else `python3 -m unittest`, else
+   plain `python3 -c` snippets. Do not install anything; if no runner can
+   run, the item is `unverified`.
 3. Wrap every run in `timeout 120` when `timeout` exists. When the suite is
    large, run only the tests a finding or claim names.
 4. Always finish with `git worktree remove --force <path>` before writing the
@@ -53,6 +57,13 @@ Verdicts: `confirmed` when execution shows the failure or the guard is
 provably gone with a citation; `disproved` when a citation or a passing
 targeted test covers the exact scenario; `unverified` otherwise, with one line
 on what is missing. A verdict resting on inference alone is `unverified`.
+Every `confirmed` carries a `basis`: `repro` (you made the scenario fail),
+`guard-removed` (a protection the origin commit added for this scenario is
+gone and nothing replaces it; the consequence itself was not reproduced), or
+`citation` (the wrong behaviour is visible in the code, e.g. dead code, a
+missing branch). Say which one; the orchestrator ranks `repro` above the
+others. A stress run that does not fail never turns `guard-removed` into
+`disproved`; note it as `not reproduced under <conditions>`.
 
 ## Per checkable claim
 
@@ -76,7 +87,7 @@ Return exactly this structure, in Markdown:
 ## Verification: <base>..<head>
 
 ### Confirmed (N)
-- <file:line> — <title>. Evidence: <cmd> → exit <code> / <file:line>. <one line why>
+- <file:line> — <title>. basis: repro|guard-removed|citation. Evidence: <cmd> → exit <code> / <file:line>. <one line why>
 
 ### Disproved (N)
 - <file:line> — <title>. Evidence: <cmd> → exit <code> / <file:line>. <one line why>
@@ -91,8 +102,8 @@ Return exactly this structure, in Markdown:
 <worktree path> created and removed   |   none: uncommitted scope
 
 ```json verdicts
-{"findings":[{"file":"","line":0,"title":"","verdict":"confirmed|disproved|unverified","evidence":[{"kind":"command|line","ref":"","detail":""}]}],"claims":[{"text":"","verdict":"done|missing|unverified","evidence":[]}]}
+{"findings":[{"file":"","line":0,"title":"","verdict":"confirmed|disproved|unverified","basis":"repro|guard-removed|citation|null","evidence":[{"kind":"command|line","ref":"","detail":""}]}],"claims":[{"text":"","verdict":"done|missing|unverified","evidence":[]}]}
 ```
 ```
 
-Omit an empty section except the JSON block. Keep the report under 80 lines.
+Omit an empty section except the JSON block. Keep the report under 90 lines.

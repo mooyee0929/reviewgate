@@ -1,8 +1,13 @@
 # reviewgate
 
-Code review gate. The full pipeline (deterministic checks, parallel LLM
-reviewers, verify, adversarial) is planned; what ships today is the first
-standalone stage, the **history agent**.
+Code review gate. Two pieces ship today:
+
+- the **history agent**, a standalone CLI that turns git history into review
+  priors for a diff (no LLM), and
+- a **multi-agent review** for Claude Code: five read-only reviewer agents run
+  in parallel, a verifier tries to confirm or refute every candidate in a
+  throwaway worktree, and the `/reviewgate` skill orchestrates the run and
+  reports only what survived.
 
 ## History agent
 
@@ -23,10 +28,12 @@ counts) and a fingerprint that survives line-number shifts.
 ### Install
 
 ```
+git clone https://github.com/mooyee0929/reviewgate ~/dev/reviewgate
 uv tool install --editable ~/dev/reviewgate
 ```
 
-or run inside the repo with `uv run reviewgate ...`.
+or run inside the repo with `uv run reviewgate ...`. The `/reviewgate` skill
+expects the clone at `~/dev/reviewgate`.
 
 ### Use
 
@@ -39,8 +46,13 @@ reviewgate history --json                  # machine readable
 reviewgate history --markdown              # sticky PR comment body
 reviewgate history --precedent flush_cache --auto-precedents 3
 reviewgate history --days 30 --window 1000 --min-together 4 --min-ratio 0.6
+reviewgate history --max-hunks 80              # hunks analyzed (default 40)
 reviewgate history --no-cache --no-cochange
+reviewgate history --json-out history.json     # also write JSON to a file
+reviewgate -C ../other-repo history            # run as if started in another dir
 ```
+
+Defaults: `--days 90`, `--window 500`, `--min-together 3`, `--min-ratio 0.5`.
 
 Exit codes: 0 ran, 2 usage (not a repo, unknown ref), 3 git failed. The
 history agent never blocks; its findings are context for a gate, not a gate.
@@ -78,7 +90,9 @@ and each owning one kind of evidence:
 `.claude/skills/reviewgate/SKILL.md` is the orchestrator (`/reviewgate`):
 it runs the history CLI, fans out to the reviewers in parallel, hands the
 candidates to the verifier and reports only what survived, ending with
-`BLOCK` / `WARN` / `OK`.
+`BLOCK` / `WARN` / `OK`. It takes an optional base ref (default
+`origin/HEAD`), `--staged`, `--working-tree`, or `--quick` (history and
+correctness reviewers only, no verifier).
 
 Install everything globally so any repo can use it:
 
@@ -96,6 +110,26 @@ New agent and skill files are picked up when a Claude Code session starts.
 it was scanned to. Later runs add only `scanned_to..HEAD`; a rebase, squash or
 changed `--window` triggers a rebuild. Commits touching more than 30 files are
 ignored as mass edits. Add `.review/` to `.gitignore`.
+
+## Layout
+
+```
+src/reviewgate/
+  cli.py              `reviewgate` entry point, exit codes
+  git.py              repo discovery, base resolution, diff text, raw history queries
+  diff.py             unified diff -> changed files with added / removed lines
+  model.py            Finding, Severity and fingerprints shared by every stage
+  history/
+    agent.py          diff -> hunks, co-change gaps, precedents -> HistoryReport
+    lines.py          hot spots (git log -L) and regression risk (git blame)
+    cochange.py       co-change table and its .review/ cache
+    precedent.py      git log -S lookups and identifier selection
+    report.py         terminal, markdown and JSON rendering
+    types.py          history data types
+.claude/agents/       reviewer and verifier agents
+.claude/skills/reviewgate/SKILL.md   /reviewgate orchestrator
+tests/                pytest suite on real temporary git repos
+```
 
 ## Development
 
